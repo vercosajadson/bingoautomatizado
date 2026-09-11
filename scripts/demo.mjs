@@ -2,6 +2,7 @@ import {
   findDuplicateAnswers,
   generateUniqueCards,
   generateTickets,
+  estimateSingleCardDraws,
   simulateGameLength,
   checkBankSizeRatio,
 } from '../src/index.mjs';
@@ -30,13 +31,16 @@ if (duplicates.length > 0) {
   process.exit(1);
 }
 
-const { percentOfBankUsed } = simulateGameLength(bank.length, cellsPerCard, cardCount, { trials: 300 });
-const issues = checkBankSizeRatio({ bankSize: bank.length, cellsPerCard, percentOfBankUsed });
+const singleCardEstimate = estimateSingleCardDraws(bank.length, cellsPerCard);
+console.log(`Estimativa rápida (1 cartela isolada): ~${singleCardEstimate.toFixed(1)} sorteios até completar`);
 
-console.log(`Estimativa: usa ~${percentOfBankUsed.toFixed(0)}% do banco até o 1º vencedor`);
+const { percentOfBankUsed } = simulateGameLength(bank.length, cellsPerCard, cardCount, { trials: 300 });
+const issues = checkBankSizeRatio({ bankSize: bank.length, cellsPerCard, cardCount, percentOfBankUsed });
+
+console.log(`Estimativa (${cardCount} cartelas em jogo): usa ~${percentOfBankUsed.toFixed(0)}% do banco até o 1º vencedor`);
 console.log('Avisos:', issues.map((i) => `[${i.level}] ${i.message}`).join(' | '));
 
-const cards = generateUniqueCards(bank, cardCount, cellsPerCard);
+const cards = generateUniqueCards(bank, cellsPerCard, cardCount);
 console.log(`Geradas ${cards.length} cartelas de ${cellsPerCard} respostas.`);
 
 const { withAnswer, withoutAnswer } = generateTickets(bank);

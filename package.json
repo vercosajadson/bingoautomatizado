@@ -1,0 +1,8 @@
+{
+  "name": "bingo-didatico-motor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
