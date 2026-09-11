@@ -196,3 +196,38 @@ consiste em:
   ao exemplo validado).
 - Variantes de vitória além de "cartela cheia" (ex: linha, coluna, diagonal)
   — pode ser considerado em versão futura, mas não faz parte deste pedido.
+
+## Direção visual (definida para o Plano 2, via skill frontend-design)
+
+A interface do gerador (formulário + preview) não é uma landing page — é uma
+ferramenta de trabalho. O elemento central da tela é a própria cartela sendo
+montada ao vivo enquanto o formulário é preenchido, não um título ou hero
+genérico.
+
+**Cor** (paleta nomeada, deliberadamente distinta do combo
+creme+terracota comum em interfaces geradas por IA):
+
+| Token | Hex | Uso |
+|---|---|---|
+| `--papel` | `#F3EFE3` | Fundo — bege kraft/manila, remete às fichas e envelopes físicos do produto |
+| `--tinta` | `#1F2A24` | Texto — quase-preto com leve matiz verde-pinho |
+| `--carimbo` | `#2F6F5E` | Ação primária e estados de sucesso — verde-carimbo ("aprovado") |
+| `--mostarda` | `#C98A1F` | Destaques na cartela ao vivo e estados de atenção |
+| `--caneta-vermelha` | `#B23A2E` | Avisos e erros de validação — a caneta de correção do professor |
+| `--linha` | `#DCD3BE` | Fio sutil para bordas de "ficha" |
+
+Esta paleta é a do CHROME da própria ferramenta (o app), não a paleta que o
+professor escolhe para o tema do bingo gerado (essa é definida por
+parâmetro no formulário, seção "Tema visual customizável").
+
+**Tipografia:** títulos e números de passo em **Zilla Slab** (serifada
+robusta, textura de material didático impresso); corpo e campos de
+formulário em **Karla** (sans humanista, legível em formulários).
+
+**Layout:** duas colunas no desktop — formulário em passos numerados à
+esquerda (1 Tema, 2 Perguntas, 3 Cartelas, 4 Visual), painel fixo à direita
+com a cartela renderizada ao vivo, o indicador de duração do jogo e os
+avisos de validação. Empilha em coluna única no mobile. Bordas retas, fio
+fino, sem cantos arredondados uniformes nem sombra genérica de card SaaS —
+como uma ficha real sobre a mesa. Botões em sentence case, sem seta
+decorativa (ex: "Gerar bingo", não "Gerar bingo →").
