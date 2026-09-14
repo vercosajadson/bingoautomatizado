@@ -68,13 +68,12 @@
     background: var(--tema-fundo, var(--superficie));
     padding: 1rem; margin-bottom: 1rem;
     text-align: center; font-family: var(--tema-fonte, 'Karla, Arial, sans-serif');
+    position: relative;
   }
-  .cartela-cabecalho { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.4rem; }
-  .cartela-titulo { font-size: 1.1rem; color: var(--tema-primaria, var(--carimbo)); }
-  .cartela-icone { display: none; width: 1.6rem; height: 1.6rem; }
-  .cartela-icone svg, .cartela-icone img { width: 100%; height: 100%; }
-  .cartela-celula { border: 1px solid var(--linha); padding: 0.75rem 0.3rem; font-size: 1.05rem; background: var(--tema-fundo, var(--superficie)); color: var(--tema-texto, var(--tinta)); overflow-wrap: anywhere; }
-  .cartela-celula svg { width: 1.6rem; height: 1.6rem; }
+  .cartela-titulo { grid-column: 1 / -1; font-size: 1.1rem; color: var(--tema-primaria, var(--carimbo)); margin-bottom: 0.4rem; position: relative; z-index: 1; }
+  .cartela-marca-dagua { position: absolute; inset: 0.6rem; z-index: 0; display: none; align-items: center; justify-content: center; opacity: 0.15; pointer-events: none; }
+  .cartela-marca-dagua svg, .cartela-marca-dagua img { width: 60%; height: 60%; object-fit: contain; }
+  .cartela-celula { border: 1px solid var(--linha); padding: 0.75rem 0.3rem; font-size: 1.05rem; color: var(--tema-texto, var(--tinta)); overflow-wrap: anywhere; position: relative; z-index: 1; }
   .estimativa { font-size: 0.9rem; margin-bottom: 0.75rem; }
   .estimativa strong { color: var(--carimbo); }
   .avisos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
@@ -153,10 +152,8 @@
 
   <aside class="previa">
     <div class="cartela" id="cartela-preview">
-      <div class="cartela-cabecalho">
-        <span class="cartela-icone" id="cartela-icone"></span>
-        <div class="cartela-titulo" id="cartela-titulo">Bingo</div>
-      </div>
+      <div class="cartela-marca-dagua" id="cartela-marca-dagua"></div>
+      <div class="cartela-titulo" id="cartela-titulo">Bingo</div>
     </div>
     <div class="estimativa" id="estimativa" aria-live="polite">Adicione perguntas para ver a estimativa de duração do jogo.</div>
     <ul class="avisos" id="avisos" aria-live="polite"></ul>
@@ -633,7 +630,7 @@
     iconesGrade: document.getElementById('icones-grade'),
     cartelaPreview: document.getElementById('cartela-preview'),
     cartelaTitulo: document.getElementById('cartela-titulo'),
-    cartelaIcone: document.getElementById('cartela-icone'),
+    cartelaMarcaDagua: document.getElementById('cartela-marca-dagua'),
     estimativa: document.getElementById('estimativa'),
     avisos: document.getElementById('avisos'),
     botaoGerar: document.getElementById('botao-gerar'),
@@ -719,15 +716,15 @@
     return cachedCard;
   }
 
-  function renderCardHeaderIcon(theme) {
-    const container = els.cartelaIcone;
+  function renderCardWatermark(theme) {
+    const container = els.cartelaMarcaDagua;
     container.innerHTML = '';
     if (imagemPersonalizadaUrl) {
       const img = document.createElement('img');
       img.src = imagemPersonalizadaUrl;
       img.alt = '';
       container.appendChild(img);
-      container.style.display = 'inline-block';
+      container.style.display = 'flex';
       return;
     }
     const iconeSelecionado = iconeSelecionadoId ? findIconById(iconeSelecionadoId) : null;
@@ -736,7 +733,7 @@
       container.innerHTML = tintado;
       const svgEl = container.querySelector('svg');
       if (svgEl) svgEl.setAttribute('aria-hidden', 'true');
-      container.style.display = 'inline-block';
+      container.style.display = 'flex';
       return;
     }
     container.style.display = 'none';
@@ -767,7 +764,7 @@
     const cardCount = clamp(Number(els.cartelas.value) || DEFAULT_CARD_COUNT, 1, 200);
 
     const theme = resolveTheme({ paletteId: paletaSelecionadaId, fontFamily: els.fonte.value });
-    renderCardHeaderIcon(theme);
+    renderCardWatermark(theme);
 
     els.cartelaTitulo.textContent = els.tema.value.trim() || 'Bingo';
     els.cartelaPreview.style.setProperty('--tema-primaria', theme.primary);
@@ -855,7 +852,35 @@
     return fontFamily && fontFamily.startsWith('Zilla') ? 'times' : 'helvetica';
   }
 
-  function renderCardPdf(doc, card, tema, theme, x, y, headerImageDataUrl) {
+  function drawWatermarkImage(doc, imageDataUrl, centerX, centerY, size, opacity) {
+    if (!imageDataUrl) return;
+    doc.saveGraphicsState();
+    doc.setGState(new doc.GState({ opacity }));
+    doc.addImage(imageDataUrl, 'PNG', centerX - size / 2, centerY - size / 2, size, size);
+    doc.restoreGraphicsState();
+  }
+
+  function drawFittedText(doc, text, centerX, centerY, maxWidth, maxHeight, maxFontSize, minFontSize) {
+    const value = String(text);
+    let fontSize = maxFontSize;
+    let lines = [value];
+    while (fontSize > minFontSize) {
+      doc.setFontSize(fontSize);
+      lines = doc.splitTextToSize(value, maxWidth);
+      const lineHeight = fontSize * 1.15;
+      if (lines.length * lineHeight <= maxHeight) break;
+      fontSize -= 1;
+    }
+    doc.setFontSize(fontSize);
+    const lineHeight = fontSize * 1.15;
+    const totalHeight = lines.length * lineHeight;
+    const firstLineY = centerY - totalHeight / 2 + lineHeight / 2;
+    lines.forEach((line, i) => {
+      doc.text(line, centerX, firstLineY + i * lineHeight, { align: 'center', baseline: 'middle' });
+    });
+  }
+
+  function renderCardPdf(doc, card, tema, theme, x, y, watermarkImageDataUrl) {
     const primary = hexToRgb(theme.primary);
     const background = hexToRgb(theme.background);
     const text = hexToRgb(theme.text);
@@ -865,17 +890,14 @@
     doc.setFillColor(background.r, background.g, background.b);
     doc.rect(x, y, CARD_WIDTH_PT, CARD_HEIGHT_PT, 'FD');
 
-    if (headerImageDataUrl) {
-      const iconeTamanho = 24;
-      doc.addImage(
-        headerImageDataUrl,
-        'PNG',
-        x + 12,
-        y + CARD_TITLE_MARGIN_TOP_PT + (CARD_TITLE_HEIGHT_PT - iconeTamanho) / 2,
-        iconeTamanho,
-        iconeTamanho
-      );
-    }
+    drawWatermarkImage(
+      doc,
+      watermarkImageDataUrl,
+      x + CARD_GRID_MARGIN_LEFT_PT + CARD_GRID_SIZE_PT / 2,
+      y + CARD_GRID_MARGIN_TOP_PT + CARD_GRID_SIZE_PT / 2,
+      CARD_GRID_SIZE_PT * 0.6,
+      0.15
+    );
 
     doc.setFont(fonte);
     doc.setTextColor(primary.r, primary.g, primary.b);
@@ -889,30 +911,39 @@
     doc.setFont('helvetica');
     doc.setDrawColor(200, 200, 200);
     doc.setTextColor(text.r, text.g, text.b);
-    doc.setFontSize(16);
     for (let i = 0; i < card.length; i++) {
       const cell = cardCellRect(i, card.length);
       doc.rect(x + cell.x, y + cell.y, cell.width, cell.height, 'S');
-      doc.text(String(card[i].answer), x + cell.x + cell.width / 2, y + cell.y + cell.height / 2, {
-        align: 'center',
-        baseline: 'middle',
-        maxWidth: cell.width - 8,
-      });
+      drawFittedText(
+        doc,
+        card[i].answer,
+        x + cell.x + cell.width / 2,
+        y + cell.y + cell.height / 2,
+        cell.width - 8,
+        cell.height - 8,
+        16,
+        8
+      );
     }
   }
 
-  function renderTicketPdf(doc, entry, comGabarito, x, y) {
+  function renderTicketPdf(doc, entry, comGabarito, x, y, watermarkImageDataUrl) {
     doc.setDrawColor(150, 150, 150);
     doc.rect(x, y, TICKET_WIDTH_PT, TICKET_HEIGHT_PT, 'S');
+
+    drawWatermarkImage(
+      doc,
+      watermarkImageDataUrl,
+      x + TICKET_WIDTH_PT / 2,
+      y + TICKET_HEIGHT_PT / 2,
+      Math.min(TICKET_WIDTH_PT, TICKET_HEIGHT_PT) * 0.6,
+      0.12
+    );
+
     doc.setFont('helvetica');
-    doc.setFontSize(14);
     doc.setTextColor(30, 30, 30);
     const texto = comGabarito ? `${entry.question} = ${entry.answer}` : entry.question;
-    doc.text(texto, x + TICKET_WIDTH_PT / 2, y + TICKET_HEIGHT_PT / 2, {
-      align: 'center',
-      baseline: 'middle',
-      maxWidth: TICKET_WIDTH_PT - 40,
-    });
+    drawFittedText(doc, texto, x + TICKET_WIDTH_PT / 2, y + TICKET_HEIGHT_PT / 2, TICKET_WIDTH_PT - 40, TICKET_HEIGHT_PT - 30, 14, 8);
   }
 
   function renderMarcadoresPdfPage(doc, theme) {
@@ -946,7 +977,7 @@
     }
   }
 
-  function buildBingoPdf({ tema, cards, tickets, theme, headerImageDataUrl }) {
+  function buildBingoPdf({ tema, cards, tickets, theme, watermarkImageDataUrl }) {
     if (!window.jspdf) {
       throw new Error('A biblioteca de geração de PDF não carregou. Verifique sua conexão e recarregue a página.');
     }
@@ -959,20 +990,20 @@
     cards.forEach((card, i) => {
       const slotOnPage = i % CARDS_PER_PAGE;
       if (slotOnPage === 0) newPdfPage(doc);
-      renderCardPdf(doc, card, tema, theme, cardSlots[slotOnPage].x, cardSlots[slotOnPage].y, headerImageDataUrl);
+      renderCardPdf(doc, card, tema, theme, cardSlots[slotOnPage].x, cardSlots[slotOnPage].y, watermarkImageDataUrl);
     });
 
     const ticketSlots = ticketPositionsForPage();
     tickets.withAnswer.forEach((entry, i) => {
       const slotOnPage = i % TICKETS_PER_PAGE;
       if (slotOnPage === 0) newPdfPage(doc);
-      renderTicketPdf(doc, entry, true, ticketSlots[slotOnPage].x, ticketSlots[slotOnPage].y);
+      renderTicketPdf(doc, entry, true, ticketSlots[slotOnPage].x, ticketSlots[slotOnPage].y, watermarkImageDataUrl);
     });
 
     tickets.withoutAnswer.forEach((entry, i) => {
       const slotOnPage = i % TICKETS_PER_PAGE;
       if (slotOnPage === 0) newPdfPage(doc);
-      renderTicketPdf(doc, entry, false, ticketSlots[slotOnPage].x, ticketSlots[slotOnPage].y);
+      renderTicketPdf(doc, entry, false, ticketSlots[slotOnPage].x, ticketSlots[slotOnPage].y, watermarkImageDataUrl);
     });
 
     newPdfPage(doc);
@@ -1023,7 +1054,7 @@
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
   }
 
-  async function resolveHeaderImageDataUrl(theme) {
+  async function resolveWatermarkImageDataUrl(theme) {
     if (imagemPersonalizadaUrl) {
       return loadImageAsDataUrl(imagemPersonalizadaUrl);
     }
@@ -1046,11 +1077,11 @@
 
     try {
       const theme = resolveTheme({ paletteId: paletaSelecionadaId, fontFamily: els.fonte.value });
-      const headerImageDataUrl = await resolveHeaderImageDataUrl(theme);
+      const watermarkImageDataUrl = await resolveWatermarkImageDataUrl(theme);
       const cards = generateUniqueCards(bank, cellsPerCard, cardCount);
       const tickets = generateTickets(bank);
       const tema = els.tema.value.trim() || 'Bingo';
-      const doc = buildBingoPdf({ tema, cards, tickets, theme, headerImageDataUrl });
+      const doc = buildBingoPdf({ tema, cards, tickets, theme, watermarkImageDataUrl });
       const blob = doc.output('blob');
 
       const downloads = await claude.use('downloads');
