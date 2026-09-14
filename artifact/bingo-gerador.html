@@ -786,11 +786,16 @@
       issues = checkBankSizeRatio({ bankSize: bank.length, cellsPerCard, cardCount });
     }
     renderWarnings(issues);
+    els.cartelaPreview.style.gridTemplateColumns = `repeat(${gridDimensions(cellsPerCard).columns}, 1fr)`;
     renderPreviewCard(bank, cellsPerCard);
 
-    els.botaoGerar.disabled = duplicates.length > 0 || bank.length === 0 || bank.length <= cellsPerCard;
+    els.botaoGerar.disabled = !canGenerate(bank, cellsPerCard, duplicates.length > 0);
 
     return { bank, cellsPerCard, cardCount, hasDuplicates: duplicates.length > 0 };
+  }
+
+  function canGenerate(bank, cellsPerCard, hasDuplicates) {
+    return !hasDuplicates && bank.length > 0 && bank.length > cellsPerCard;
   }
 
   const scheduleAccurateEstimate = debounce((bank, cellsPerCard, cardCount) => {
@@ -836,9 +841,9 @@
     doc.setFontSize(12);
     const linhas = [
       'Como jogar:',
-      '1. Cada participante recebe uma cartela com respostas distribuidas aleatoriamente.',
+      '1. Cada participante recebe uma cartela com respostas distribuídas aleatoriamente.',
       '2. O organizador sorteia uma ficha por vez e faz a leitura da pergunta.',
-      '3. Os participantes verificam se a resposta esta na cartela e marcam.',
+      '3. Os participantes verificam se a resposta está na cartela e marcam.',
       '4. Vence quem completar a cartela primeiro.',
     ];
     linhas.forEach((linha, i) => {
@@ -846,22 +851,42 @@
     });
   }
 
-  function renderCardPdf(doc, card, tema, theme, x, y) {
+  function jsPdfFontForTheme(fontFamily) {
+    return fontFamily && fontFamily.startsWith('Zilla') ? 'times' : 'helvetica';
+  }
+
+  function renderCardPdf(doc, card, tema, theme, x, y, headerImageDataUrl) {
     const primary = hexToRgb(theme.primary);
     const background = hexToRgb(theme.background);
     const text = hexToRgb(theme.text);
+    const fonte = jsPdfFontForTheme(theme.fontFamily);
 
     doc.setDrawColor(primary.r, primary.g, primary.b);
     doc.setFillColor(background.r, background.g, background.b);
     doc.rect(x, y, CARD_WIDTH_PT, CARD_HEIGHT_PT, 'FD');
 
+    if (headerImageDataUrl) {
+      const iconeTamanho = 24;
+      doc.addImage(
+        headerImageDataUrl,
+        'PNG',
+        x + 12,
+        y + CARD_TITLE_MARGIN_TOP_PT + (CARD_TITLE_HEIGHT_PT - iconeTamanho) / 2,
+        iconeTamanho,
+        iconeTamanho
+      );
+    }
+
+    doc.setFont(fonte);
     doc.setTextColor(primary.r, primary.g, primary.b);
     doc.setFontSize(20);
     doc.text(tema, x + CARD_WIDTH_PT / 2, y + CARD_TITLE_MARGIN_TOP_PT + CARD_TITLE_HEIGHT_PT / 2, {
       align: 'center',
       baseline: 'middle',
+      maxWidth: CARD_WIDTH_PT - 24,
     });
 
+    doc.setFont('helvetica');
     doc.setDrawColor(200, 200, 200);
     doc.setTextColor(text.r, text.g, text.b);
     doc.setFontSize(16);
@@ -871,6 +896,7 @@
       doc.text(String(card[i].answer), x + cell.x + cell.width / 2, y + cell.y + cell.height / 2, {
         align: 'center',
         baseline: 'middle',
+        maxWidth: cell.width - 8,
       });
     }
   }
@@ -878,13 +904,14 @@
   function renderTicketPdf(doc, entry, comGabarito, x, y) {
     doc.setDrawColor(150, 150, 150);
     doc.rect(x, y, TICKET_WIDTH_PT, TICKET_HEIGHT_PT, 'S');
+    doc.setFont('helvetica');
     doc.setFontSize(14);
     doc.setTextColor(30, 30, 30);
     const texto = comGabarito ? `${entry.question} = ${entry.answer}` : entry.question;
     doc.text(texto, x + TICKET_WIDTH_PT / 2, y + TICKET_HEIGHT_PT / 2, {
       align: 'center',
       baseline: 'middle',
-      maxWidth: TICKET_CONTENT_SIZE_PT,
+      maxWidth: TICKET_WIDTH_PT - 40,
     });
   }
 
@@ -904,9 +931,11 @@
     }
   }
 
-  function renderRascunhoPdfPage(doc) {
+  function renderRascunhoPdfPage(doc, theme) {
+    const primary = hexToRgb(theme.primary);
+    doc.setFont('helvetica');
     doc.setFontSize(18);
-    doc.setTextColor(30, 30, 30);
+    doc.setTextColor(primary.r, primary.g, primary.b);
     doc.text('Folha de rascunho', PAGE_WIDTH_PT / 2, 50, { align: 'center' });
     doc.setDrawColor(200, 200, 200);
     const inicioY = 90;
@@ -917,7 +946,10 @@
     }
   }
 
-  function buildBingoPdf({ tema, cards, tickets, theme }) {
+  function buildBingoPdf({ tema, cards, tickets, theme, headerImageDataUrl }) {
+    if (!window.jspdf) {
+      throw new Error('A biblioteca de geração de PDF não carregou. Verifique sua conexão e recarregue a página.');
+    }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [PAGE_WIDTH_PT, PAGE_HEIGHT_PT] });
 
@@ -927,7 +959,7 @@
     cards.forEach((card, i) => {
       const slotOnPage = i % CARDS_PER_PAGE;
       if (slotOnPage === 0) newPdfPage(doc);
-      renderCardPdf(doc, card, tema, theme, cardSlots[slotOnPage].x, cardSlots[slotOnPage].y);
+      renderCardPdf(doc, card, tema, theme, cardSlots[slotOnPage].x, cardSlots[slotOnPage].y, headerImageDataUrl);
     });
 
     const ticketSlots = ticketPositionsForPage();
@@ -947,7 +979,7 @@
     renderMarcadoresPdfPage(doc, theme);
 
     newPdfPage(doc);
-    renderRascunhoPdfPage(doc);
+    renderRascunhoPdfPage(doc, theme);
 
     return doc;
   }
@@ -971,32 +1003,84 @@
     el.addEventListener('input', scheduleUpdate);
   }
 
+  function loadImageAsDataUrl(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 64;
+        canvas.height = img.naturalHeight || 64;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('Não foi possível carregar a imagem do tema.'));
+      img.src = src;
+    });
+  }
+
+  function svgToDataUrl(svgMarkup) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
+  }
+
+  async function resolveHeaderImageDataUrl(theme) {
+    if (imagemPersonalizadaUrl) {
+      return loadImageAsDataUrl(imagemPersonalizadaUrl);
+    }
+    const iconeSelecionado = iconeSelecionadoId ? findIconById(iconeSelecionadoId) : null;
+    if (iconeSelecionado) {
+      const tintado = tintSvg(iconeSelecionado.svg, theme.primary);
+      return loadImageAsDataUrl(svgToDataUrl(tintado));
+    }
+    return null;
+  }
+
   els.botaoGerar.addEventListener('click', async () => {
     const { bank, cellsPerCard, cardCount, hasDuplicates } = updateCheap();
-    if (hasDuplicates || bank.length === 0 || bank.length <= cellsPerCard) return;
+    if (!canGenerate(bank, cellsPerCard, hasDuplicates)) return;
 
     els.botaoGerar.disabled = true;
     const textoOriginal = els.botaoGerar.textContent;
     els.botaoGerar.textContent = 'Gerando...';
+    await new Promise((resolve) => requestAnimationFrame(resolve));
 
     try {
       const theme = resolveTheme({ paletteId: paletaSelecionadaId, fontFamily: els.fonte.value });
+      const headerImageDataUrl = await resolveHeaderImageDataUrl(theme);
       const cards = generateUniqueCards(bank, cellsPerCard, cardCount);
       const tickets = generateTickets(bank);
       const tema = els.tema.value.trim() || 'Bingo';
-      const doc = buildBingoPdf({ tema, cards, tickets, theme });
+      const doc = buildBingoPdf({ tema, cards, tickets, theme, headerImageDataUrl });
       const blob = doc.output('blob');
 
       const downloads = await claude.use('downloads');
-      if (downloads) {
-        const nomeArquivo = tema.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'bingo';
-        await downloads.save({ filename: `${nomeArquivo}.pdf`, data: blob });
+      if (!downloads) {
+        renderWarnings([{ level: 'error', message: 'Não foi possível baixar o PDF neste ambiente.' }]);
+      } else {
+        const nomeArquivoBase = tema
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+        const nomeArquivo = nomeArquivoBase || 'bingo';
+        try {
+          await downloads.save({ filename: `${nomeArquivo}.pdf`, data: blob });
+        } catch (saveError) {
+          if (saveError && saveError.code !== 'declined') {
+            const mensagem =
+              saveError && saveError.code === 'rate_limited'
+                ? 'Muitas tentativas seguidas — aguarde um momento e tente novamente.'
+                : `Não foi possível salvar o PDF: ${saveError && saveError.message ? saveError.message : 'erro desconhecido'}.`;
+            renderWarnings([{ level: 'error', message: mensagem }]);
+          }
+        }
       }
     } catch (error) {
-      renderWarnings([{ level: 'error', message: `Não foi possível gerar o PDF: ${error.message}` }]);
+      renderWarnings([{ level: 'error', message: `Não foi possível gerar o PDF: ${error && error.message ? error.message : 'erro desconhecido'}.` }]);
     } finally {
-      els.botaoGerar.disabled = hasDuplicates || bank.length === 0 || bank.length <= cellsPerCard;
       els.botaoGerar.textContent = textoOriginal;
+      updateCheap();
     }
   });
 
