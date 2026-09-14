@@ -2,7 +2,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=Karla:wght@400;500;700&display=swap">
 <style>
   :root {
-    color-scheme: light;
+    color-scheme: light dark;
     --papel: #F3EFE3;
     --superficie: #FFFFFF;
     --tinta: #1F2A24;
@@ -37,7 +37,10 @@
   .topo { padding: 1.5rem 2rem; border-bottom: 1px solid var(--linha); }
   .topo h1 { margin: 0; font-size: 1.5rem; font-weight: 600; }
   .layout { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 2rem; padding: 2rem; max-width: 1100px; margin: 0 auto; align-items: start; }
-  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .previa { position: static; order: -1; }
+  }
   .passo { border: 1px solid var(--linha); padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; background: var(--superficie); }
   .passo-cabecalho { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.75rem; }
   .passo-numero { font-size: 1.1rem; color: var(--carimbo); }
@@ -61,17 +64,21 @@
   .previa { position: sticky; top: 1.5rem; border: 1px solid var(--linha); background: var(--superficie); padding: 1.5rem; }
   .cartela {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;
-    border: 2px solid var(--tema-primaria, var(--carimbo)); padding: 1rem; margin-bottom: 1rem;
-    text-align: center; font-family: var(--tema-fonte, 'Karla'), sans-serif;
+    border: 1px solid var(--tema-primaria, var(--carimbo));
+    background: var(--tema-fundo, var(--superficie));
+    padding: 1rem; margin-bottom: 1rem;
+    text-align: center; font-family: var(--tema-fonte, 'Karla, Arial, sans-serif');
   }
   .cartela-titulo { grid-column: 1 / -1; font-size: 1.1rem; color: var(--tema-primaria, var(--carimbo)); margin-bottom: 0.4rem; }
-  .cartela-celula { border: 1px solid var(--linha); padding: 0.75rem 0.3rem; font-size: 1.05rem; background: var(--tema-fundo, var(--superficie)); color: var(--tema-texto, var(--tinta)); }
+  .cartela-celula { border: 1px solid var(--linha); padding: 0.75rem 0.3rem; font-size: 1.05rem; background: var(--tema-fundo, var(--superficie)); color: var(--tema-texto, var(--tinta)); overflow-wrap: anywhere; }
+  .cartela-celula svg { width: 1.6rem; height: 1.6rem; }
   .estimativa { font-size: 0.9rem; margin-bottom: 0.75rem; }
   .estimativa strong { color: var(--carimbo); }
   .avisos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
   .aviso { font-size: 0.85rem; padding: 0.5rem 0.7rem; border-left: 3px solid var(--caneta); background: color-mix(in srgb, var(--caneta) 12%, var(--superficie)); }
   .aviso.aviso-ok { border-left-color: var(--carimbo); background: color-mix(in srgb, var(--carimbo) 12%, var(--superficie)); }
-  .imagem-preview { display: none; max-width: 4rem; margin-top: 0.5rem; border: 1px solid var(--linha); }
+  .aviso.aviso-atencao { border-left-color: var(--mostarda); background: color-mix(in srgb, var(--mostarda) 12%, var(--superficie)); }
+  .imagem-preview { max-width: 4rem; margin-top: 0.5rem; border: 1px solid var(--linha); }
 </style>
 
 <header class="topo">
@@ -101,11 +108,11 @@
       <div class="passo-cabecalho"><span class="passo-numero">3</span><h2>Cartelas</h2></div>
       <div class="campo">
         <label for="campo-cartelas">Número de cartelas</label>
-        <input type="number" id="campo-cartelas" min="1" value="40">
+        <input type="number" id="campo-cartelas" min="1" max="200" value="40">
       </div>
       <div class="campo">
         <label for="campo-respostas-cartela">Respostas por cartela</label>
-        <input type="number" id="campo-respostas-cartela" min="1" value="9">
+        <input type="number" id="campo-respostas-cartela" min="1" max="100" value="9">
       </div>
     </section>
 
@@ -129,17 +136,18 @@
       <div class="campo">
         <label for="campo-imagem">Ou envie sua própria imagem</label>
         <input type="file" id="campo-imagem" accept="image/*">
-        <img class="imagem-preview" id="imagem-preview" alt="Pré-visualização da imagem enviada">
+        <img class="imagem-preview" id="imagem-preview" alt="Pré-visualização da imagem enviada" hidden>
       </div>
     </section>
   </form>
 
-  <aside class="previa" aria-live="polite">
+  <aside class="previa">
     <div class="cartela" id="cartela-preview">
       <div class="cartela-titulo" id="cartela-titulo">Bingo</div>
     </div>
-    <div class="estimativa" id="estimativa">Adicione perguntas para ver a estimativa de duração do jogo.</div>
-    <ul class="avisos" id="avisos"></ul>
+    <div class="estimativa" id="estimativa" aria-live="polite">Adicione perguntas para ver a estimativa de duração do jogo.</div>
+    <ul class="avisos" id="avisos" aria-live="polite"></ul>
+    <p class="ajuda">Esta é uma prévia do formulário e do visual da cartela. A exportação em PDF chega em uma próxima etapa — por enquanto, use esta página para montar e conferir o tema do seu bingo.</p>
   </aside>
 </main>
 
@@ -476,23 +484,36 @@
   // ===== FIM: motor inlined =====
 
   function parseQuestionBank(text) {
-    return text
+    const lines = text
       .split('\n')
       .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => {
-        const [question, answer] = line.split('|').map((part) => (part ?? '').trim());
-        return { question: question ?? '', answer: answer ?? '' };
-      })
-      .filter((entry) => entry.question && entry.answer);
+      .filter((line) => line.length > 0);
+
+    const entries = [];
+    let ignored = 0;
+    for (const line of lines) {
+      const [question, answer] = line.split('|').map((part) => (part ?? '').trim());
+      if (question && answer) {
+        entries.push({ question, answer });
+      } else {
+        ignored++;
+      }
+    }
+    return { entries, ignored };
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
   }
 
   function debounce(fn, delay) {
     let handle;
-    return (...args) => {
+    const debounced = (...args) => {
       clearTimeout(handle);
       handle = setTimeout(() => fn(...args), delay);
     };
+    debounced.cancel = () => clearTimeout(handle);
+    return debounced;
   }
 
   const els = {
@@ -515,13 +536,17 @@
   let paletaSelecionadaId = PALETTE_PRESETS[0].id;
   let iconeSelecionadoId = null;
   let imagemPersonalizadaUrl = null;
+  let cachedCardKey = null;
+  let cachedCard = null;
 
   function renderPalettes() {
     els.paletas.innerHTML = '';
     for (const preset of PALETTE_PRESETS) {
       const opcao = document.createElement('button');
       opcao.type = 'button';
-      opcao.className = 'paleta-opcao' + (preset.id === paletaSelecionadaId ? ' selecionada' : '');
+      const selecionada = preset.id === paletaSelecionadaId;
+      opcao.className = 'paleta-opcao' + (selecionada ? ' selecionada' : '');
+      opcao.setAttribute('aria-pressed', String(selecionada));
       opcao.innerHTML = `<span class="paleta-swatch" style="background:${preset.primary}"></span><span>${preset.name}</span>`;
       opcao.addEventListener('click', () => {
         paletaSelecionadaId = preset.id;
@@ -546,8 +571,11 @@
       for (const icone of categoria) {
         const botao = document.createElement('button');
         botao.type = 'button';
-        botao.className = 'icone-opcao' + (icone.id === iconeSelecionadoId ? ' selecionado' : '');
+        const selecionado = icone.id === iconeSelecionadoId;
+        botao.className = 'icone-opcao' + (selecionado ? ' selecionado' : '');
         botao.title = icone.label;
+        botao.setAttribute('aria-label', icone.label);
+        botao.setAttribute('aria-pressed', String(selecionado));
         botao.innerHTML = icone.svg;
         botao.addEventListener('click', () => {
           iconeSelecionadoId = iconeSelecionadoId === icone.id ? null : icone.id;
@@ -563,31 +591,59 @@
     els.avisos.innerHTML = '';
     for (const issue of issues) {
       const item = document.createElement('li');
-      item.className = 'aviso' + (issue.level === 'ok' ? ' aviso-ok' : '');
+      let className = 'aviso';
+      if (issue.level === 'ok') className += ' aviso-ok';
+      else if (issue.level === 'warning') className += ' aviso-atencao';
+      item.className = className;
       item.textContent = issue.message;
       els.avisos.appendChild(item);
     }
+  }
+
+  function getStablePreviewCard(bank, cellsPerCard) {
+    const key = cellsPerCard + '|' + bank.map((entry) => entry.question + '::' + entry.answer).join('|');
+    if (key !== cachedCardKey) {
+      cachedCardKey = key;
+      try {
+        cachedCard = generateUniqueCards(bank, cellsPerCard, 1)[0];
+      } catch {
+        cachedCard = null;
+      }
+    }
+    return cachedCard;
   }
 
   function renderPreviewCard(bank, cellsPerCard, theme) {
     els.cartelaPreview.querySelectorAll('.cartela-celula').forEach((cell) => cell.remove());
     if (bank.length === 0 || bank.length <= cellsPerCard) return;
 
-    let card;
-    try {
-      card = generateUniqueCards(bank, cellsPerCard, 1)[0];
-    } catch {
-      return;
-    }
+    const sampledCard = getStablePreviewCard(bank, cellsPerCard);
+    if (!sampledCard) return;
+    let card = sampledCard;
 
-    const iconeSelecionado = iconeSelecionadoId ? findIconById(iconeSelecionadoId) : null;
-    if (iconeSelecionado && !imagemPersonalizadaUrl) {
-      const tintado = tintSvg(iconeSelecionado.svg, theme.primary);
-      const iconeCelula = document.createElement('div');
-      iconeCelula.className = 'cartela-celula';
-      iconeCelula.innerHTML = tintado;
-      els.cartelaPreview.appendChild(iconeCelula);
+    if (imagemPersonalizadaUrl) {
+      const imagemCelula = document.createElement('div');
+      imagemCelula.className = 'cartela-celula';
+      const img = document.createElement('img');
+      img.src = imagemPersonalizadaUrl;
+      img.alt = '';
+      img.style.maxWidth = '2rem';
+      img.style.maxHeight = '2rem';
+      imagemCelula.appendChild(img);
+      els.cartelaPreview.appendChild(imagemCelula);
       card = card.slice(0, cellsPerCard - 1);
+    } else {
+      const iconeSelecionado = iconeSelecionadoId ? findIconById(iconeSelecionadoId) : null;
+      if (iconeSelecionado) {
+        const tintado = tintSvg(iconeSelecionado.svg, theme.primary);
+        const iconeCelula = document.createElement('div');
+        iconeCelula.className = 'cartela-celula';
+        iconeCelula.innerHTML = tintado;
+        const svgEl = iconeCelula.querySelector('svg');
+        if (svgEl) svgEl.setAttribute('aria-hidden', 'true');
+        els.cartelaPreview.appendChild(iconeCelula);
+        card = card.slice(0, cellsPerCard - 1);
+      }
     }
 
     for (const entry of card) {
@@ -599,11 +655,13 @@
   }
 
   function updateCheap() {
-    const bank = parseQuestionBank(els.perguntas.value);
-    els.contagem.textContent = `${bank.length} pergunta${bank.length === 1 ? '' : 's'}`;
+    const { entries: bank, ignored } = parseQuestionBank(els.perguntas.value);
+    els.contagem.textContent =
+      `${bank.length} pergunta${bank.length === 1 ? '' : 's'}` +
+      (ignored > 0 ? ` (${ignored} linha${ignored === 1 ? '' : 's'} ignorada${ignored === 1 ? '' : 's'} sem "|")` : '');
 
-    const cellsPerCard = Number(els.respostasCartela.value) || DEFAULT_CELLS_PER_CARD;
-    const cardCount = Number(els.cartelas.value) || DEFAULT_CARD_COUNT;
+    const cellsPerCard = clamp(Number(els.respostasCartela.value) || DEFAULT_CELLS_PER_CARD, 1, 100);
+    const cardCount = clamp(Number(els.cartelas.value) || DEFAULT_CARD_COUNT, 1, 200);
 
     const theme = resolveTheme({ paletteId: paletaSelecionadaId, fontFamily: els.fonte.value });
 
@@ -618,7 +676,7 @@
     if (duplicates.length > 0) {
       issues = duplicates.map((group) => ({
         level: 'error',
-        message: `Respostas repetidas: ${group.map((entry) => `"${entry.answer}"`).join(', ')} — cada resposta precisa ser única.`,
+        message: `A resposta "${group[0].answer}" se repete nas perguntas: ${group.map((entry) => `"${entry.question}"`).join(', ')} — cada resposta precisa ser única.`,
       }));
     } else if (bank.length > 0) {
       issues = checkBankSizeRatio({ bankSize: bank.length, cellsPerCard, cardCount });
@@ -640,22 +698,32 @@
     const { bank, cellsPerCard, cardCount, hasDuplicates } = updateCheap();
     if (!hasDuplicates && bank.length > cellsPerCard) {
       scheduleAccurateEstimate(bank, cellsPerCard, cardCount);
-    } else if (bank.length === 0) {
+      return;
+    }
+    scheduleAccurateEstimate.cancel();
+    if (bank.length === 0) {
       els.estimativa.textContent = 'Adicione perguntas para ver a estimativa de duração do jogo.';
+    } else if (hasDuplicates) {
+      els.estimativa.textContent = 'Corrija as respostas repetidas para ver a estimativa de duração do jogo.';
+    } else {
+      els.estimativa.textContent = 'Adicione mais perguntas para ver a estimativa de duração do jogo.';
     }
   }
 
   els.imagem.addEventListener('change', () => {
     const file = els.imagem.files[0];
+    if (imagemPersonalizadaUrl) URL.revokeObjectURL(imagemPersonalizadaUrl);
     imagemPersonalizadaUrl = file ? URL.createObjectURL(file) : null;
     if (imagemPersonalizadaUrl) {
       els.imagemPreview.src = imagemPersonalizadaUrl;
-      els.imagemPreview.style.display = 'block';
+      els.imagemPreview.hidden = false;
     } else {
-      els.imagemPreview.style.display = 'none';
+      els.imagemPreview.hidden = true;
     }
     scheduleUpdate();
   });
+
+  document.getElementById('formulario').addEventListener('submit', (event) => event.preventDefault());
 
   for (const el of [els.tema, els.perguntas, els.cartelas, els.respostasCartela, els.fonte]) {
     el.addEventListener('input', scheduleUpdate);
