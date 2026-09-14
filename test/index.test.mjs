@@ -76,3 +76,14 @@ test('index.mjs re-exports the theme and icon library', () => {
   assert.ok(Array.isArray(engine.PALETTE_PRESETS));
   assert.equal(typeof engine.ICON_CATEGORIES, 'object');
 });
+
+test('index.mjs re-exports questionBank and pdfLayout', () => {
+  assert.equal(typeof engine.parseQuestionBank, 'function');
+  assert.equal(typeof engine.gridDimensions, 'function');
+  assert.equal(typeof engine.cardSlot, 'function');
+  assert.equal(typeof engine.cardCellRect, 'function');
+  assert.equal(typeof engine.ticketSlot, 'function');
+  assert.equal(typeof engine.paginate, 'function');
+  assert.equal(typeof engine.PAGE_WIDTH_PT, 'number');
+  assert.equal(typeof engine.CARD_WIDTH_PT, 'number');
+});
