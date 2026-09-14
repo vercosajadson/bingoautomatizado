@@ -69,7 +69,10 @@
     padding: 1rem; margin-bottom: 1rem;
     text-align: center; font-family: var(--tema-fonte, 'Karla, Arial, sans-serif');
   }
-  .cartela-titulo { grid-column: 1 / -1; font-size: 1.1rem; color: var(--tema-primaria, var(--carimbo)); margin-bottom: 0.4rem; }
+  .cartela-cabecalho { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+  .cartela-titulo { font-size: 1.1rem; color: var(--tema-primaria, var(--carimbo)); }
+  .cartela-icone { display: none; width: 1.6rem; height: 1.6rem; }
+  .cartela-icone svg, .cartela-icone img { width: 100%; height: 100%; }
   .cartela-celula { border: 1px solid var(--linha); padding: 0.75rem 0.3rem; font-size: 1.05rem; background: var(--tema-fundo, var(--superficie)); color: var(--tema-texto, var(--tinta)); overflow-wrap: anywhere; }
   .cartela-celula svg { width: 1.6rem; height: 1.6rem; }
   .estimativa { font-size: 0.9rem; margin-bottom: 0.75rem; }
@@ -79,6 +82,13 @@
   .aviso.aviso-ok { border-left-color: var(--carimbo); background: color-mix(in srgb, var(--carimbo) 12%, var(--superficie)); }
   .aviso.aviso-atencao { border-left-color: var(--mostarda); background: color-mix(in srgb, var(--mostarda) 12%, var(--superficie)); }
   .imagem-preview { max-width: 4rem; margin-top: 0.5rem; border: 1px solid var(--linha); }
+  .botao-primario {
+    display: block; width: 100%; margin-top: 0.75rem; padding: 0.7rem 1.2rem;
+    background: var(--carimbo); color: var(--superficie); border: none;
+    font-family: inherit; font-size: 0.95rem; cursor: pointer;
+  }
+  .botao-primario:disabled { opacity: 0.5; cursor: not-allowed; }
+  .botao-primario:hover:not(:disabled) { background: color-mix(in srgb, var(--carimbo) 85%, black); }
 </style>
 
 <header class="topo">
@@ -143,14 +153,19 @@
 
   <aside class="previa">
     <div class="cartela" id="cartela-preview">
-      <div class="cartela-titulo" id="cartela-titulo">Bingo</div>
+      <div class="cartela-cabecalho">
+        <span class="cartela-icone" id="cartela-icone"></span>
+        <div class="cartela-titulo" id="cartela-titulo">Bingo</div>
+      </div>
     </div>
     <div class="estimativa" id="estimativa" aria-live="polite">Adicione perguntas para ver a estimativa de duração do jogo.</div>
     <ul class="avisos" id="avisos" aria-live="polite"></ul>
-    <p class="ajuda">Esta é uma prévia do formulário e do visual da cartela. A exportação em PDF chega em uma próxima etapa — por enquanto, use esta página para montar e conferir o tema do seu bingo.</p>
+    <button type="button" id="botao-gerar" class="botao-primario" disabled>Gerar bingo</button>
+    <p class="ajuda">O PDF inclui cartelas, fichas de sorteio (com e sem gabarito), folha explicativa, marcadores e uma folha de rascunho.</p>
   </aside>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
   // ===== INÍCIO: motor inlined (Plano 1 + Plano 2) =====
 
@@ -481,8 +496,7 @@
     ],
   };
 
-  // ===== FIM: motor inlined =====
-
+  // --- src/questionBank.mjs ---
   function parseQuestionBank(text) {
     const lines = text
       .split('\n')
@@ -501,6 +515,96 @@
     }
     return { entries, ignored };
   }
+
+  // --- src/pdfLayout.mjs ---
+  const PAGE_WIDTH_PT = 822;
+  const PAGE_HEIGHT_PT = 595.5;
+
+  const CARD_WIDTH_PT = 392.3;
+  const CARD_HEIGHT_PT = 442.9;
+  const CARD_MARGIN_LEFT_PT = 15.2;
+  const CARD_MARGIN_TOP_PT = 51.9;
+  const CARD_GAP_PT = 3.4;
+  const CARDS_PER_PAGE = 2;
+
+  const CARD_TITLE_HEIGHT_PT = 75;
+  const CARD_TITLE_MARGIN_TOP_PT = 15.7;
+
+  const CARD_GRID_SIZE_PT = 319.2;
+  const CARD_GRID_MARGIN_TOP_PT = 78.0;
+  const CARD_GRID_MARGIN_LEFT_PT = 36.6;
+
+  const TICKET_WIDTH_PT = 336.7;
+  const TICKET_HEIGHT_PT = 181.1;
+  const TICKET_MARGIN_LEFT_PT = 15.3;
+  const TICKET_MARGIN_TOP_PT = 5.9;
+  const TICKET_COL_GAP_PT = 5.3;
+  const TICKET_ROW_GAP_PT = 6.9;
+  const TICKETS_PER_ROW = 2;
+  const TICKETS_PER_COL = 3;
+  const TICKETS_PER_PAGE = TICKETS_PER_ROW * TICKETS_PER_COL;
+
+  const TICKET_CONTENT_SIZE_PT = 129.3;
+
+  function gridDimensions(cellsPerCard) {
+    const columns = Math.ceil(Math.sqrt(cellsPerCard));
+    const rows = Math.ceil(cellsPerCard / columns);
+    return { columns, rows };
+  }
+
+  function cardPositionsForPage() {
+    return [
+      { x: CARD_MARGIN_LEFT_PT, y: CARD_MARGIN_TOP_PT },
+      { x: CARD_MARGIN_LEFT_PT + CARD_WIDTH_PT + CARD_GAP_PT, y: CARD_MARGIN_TOP_PT },
+    ];
+  }
+
+  function cardSlot(index) {
+    const page = Math.floor(index / CARDS_PER_PAGE);
+    const slotOnPage = index % CARDS_PER_PAGE;
+    const origin = cardPositionsForPage()[slotOnPage];
+    return { page, x: origin.x, y: origin.y };
+  }
+
+  function cardCellRect(cellIndex, cellsPerCard) {
+    const { columns, rows } = gridDimensions(cellsPerCard);
+    const cellWidth = CARD_GRID_SIZE_PT / columns;
+    const cellHeight = CARD_GRID_SIZE_PT / rows;
+    const col = cellIndex % columns;
+    const row = Math.floor(cellIndex / columns);
+    return {
+      x: CARD_GRID_MARGIN_LEFT_PT + col * cellWidth,
+      y: CARD_GRID_MARGIN_TOP_PT + row * cellHeight,
+      width: cellWidth,
+      height: cellHeight,
+    };
+  }
+
+  function ticketPositionsForPage() {
+    const positions = [];
+    for (let row = 0; row < TICKETS_PER_COL; row++) {
+      for (let col = 0; col < TICKETS_PER_ROW; col++) {
+        positions.push({
+          x: TICKET_MARGIN_LEFT_PT + col * (TICKET_WIDTH_PT + TICKET_COL_GAP_PT),
+          y: TICKET_MARGIN_TOP_PT + row * (TICKET_HEIGHT_PT + TICKET_ROW_GAP_PT),
+        });
+      }
+    }
+    return positions;
+  }
+
+  function ticketSlot(index) {
+    const page = Math.floor(index / TICKETS_PER_PAGE);
+    const slotOnPage = index % TICKETS_PER_PAGE;
+    const origin = ticketPositionsForPage()[slotOnPage];
+    return { page, x: origin.x, y: origin.y };
+  }
+
+  function paginate(itemCount, itemsPerPage) {
+    return Math.ceil(itemCount / itemsPerPage);
+  }
+
+  // ===== FIM: motor inlined =====
 
   function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
@@ -529,8 +633,10 @@
     iconesGrade: document.getElementById('icones-grade'),
     cartelaPreview: document.getElementById('cartela-preview'),
     cartelaTitulo: document.getElementById('cartela-titulo'),
+    cartelaIcone: document.getElementById('cartela-icone'),
     estimativa: document.getElementById('estimativa'),
     avisos: document.getElementById('avisos'),
+    botaoGerar: document.getElementById('botao-gerar'),
   };
 
   let paletaSelecionadaId = PALETTE_PRESETS[0].id;
@@ -613,38 +719,35 @@
     return cachedCard;
   }
 
-  function renderPreviewCard(bank, cellsPerCard, theme) {
-    els.cartelaPreview.querySelectorAll('.cartela-celula').forEach((cell) => cell.remove());
-    if (bank.length === 0 || bank.length <= cellsPerCard) return;
-
-    const sampledCard = getStablePreviewCard(bank, cellsPerCard);
-    if (!sampledCard) return;
-    let card = sampledCard;
-
+  function renderCardHeaderIcon(theme) {
+    const container = els.cartelaIcone;
+    container.innerHTML = '';
     if (imagemPersonalizadaUrl) {
-      const imagemCelula = document.createElement('div');
-      imagemCelula.className = 'cartela-celula';
       const img = document.createElement('img');
       img.src = imagemPersonalizadaUrl;
       img.alt = '';
-      img.style.maxWidth = '2rem';
-      img.style.maxHeight = '2rem';
-      imagemCelula.appendChild(img);
-      els.cartelaPreview.appendChild(imagemCelula);
-      card = card.slice(0, cellsPerCard - 1);
-    } else {
-      const iconeSelecionado = iconeSelecionadoId ? findIconById(iconeSelecionadoId) : null;
-      if (iconeSelecionado) {
-        const tintado = tintSvg(iconeSelecionado.svg, theme.primary);
-        const iconeCelula = document.createElement('div');
-        iconeCelula.className = 'cartela-celula';
-        iconeCelula.innerHTML = tintado;
-        const svgEl = iconeCelula.querySelector('svg');
-        if (svgEl) svgEl.setAttribute('aria-hidden', 'true');
-        els.cartelaPreview.appendChild(iconeCelula);
-        card = card.slice(0, cellsPerCard - 1);
-      }
+      container.appendChild(img);
+      container.style.display = 'inline-block';
+      return;
     }
+    const iconeSelecionado = iconeSelecionadoId ? findIconById(iconeSelecionadoId) : null;
+    if (iconeSelecionado) {
+      const tintado = tintSvg(iconeSelecionado.svg, theme.primary);
+      container.innerHTML = tintado;
+      const svgEl = container.querySelector('svg');
+      if (svgEl) svgEl.setAttribute('aria-hidden', 'true');
+      container.style.display = 'inline-block';
+      return;
+    }
+    container.style.display = 'none';
+  }
+
+  function renderPreviewCard(bank, cellsPerCard) {
+    els.cartelaPreview.querySelectorAll('.cartela-celula').forEach((cell) => cell.remove());
+    if (bank.length === 0 || bank.length <= cellsPerCard) return;
+
+    const card = getStablePreviewCard(bank, cellsPerCard);
+    if (!card) return;
 
     for (const entry of card) {
       const celula = document.createElement('div');
@@ -664,6 +767,7 @@
     const cardCount = clamp(Number(els.cartelas.value) || DEFAULT_CARD_COUNT, 1, 200);
 
     const theme = resolveTheme({ paletteId: paletaSelecionadaId, fontFamily: els.fonte.value });
+    renderCardHeaderIcon(theme);
 
     els.cartelaTitulo.textContent = els.tema.value.trim() || 'Bingo';
     els.cartelaPreview.style.setProperty('--tema-primaria', theme.primary);
@@ -682,7 +786,9 @@
       issues = checkBankSizeRatio({ bankSize: bank.length, cellsPerCard, cardCount });
     }
     renderWarnings(issues);
-    renderPreviewCard(bank, cellsPerCard, theme);
+    renderPreviewCard(bank, cellsPerCard);
+
+    els.botaoGerar.disabled = duplicates.length > 0 || bank.length === 0 || bank.length <= cellsPerCard;
 
     return { bank, cellsPerCard, cardCount, hasDuplicates: duplicates.length > 0 };
   }
@@ -710,6 +816,142 @@
     }
   }
 
+  function hexToRgb(hex) {
+    const value = hex.replace('#', '');
+    return {
+      r: parseInt(value.slice(0, 2), 16),
+      g: parseInt(value.slice(2, 4), 16),
+      b: parseInt(value.slice(4, 6), 16),
+    };
+  }
+
+  function newPdfPage(doc) {
+    doc.addPage([PAGE_WIDTH_PT, PAGE_HEIGHT_PT], 'landscape');
+  }
+
+  function renderExplicativaPdfPage(doc, tema) {
+    doc.setFontSize(24);
+    doc.setTextColor(30, 30, 30);
+    doc.text(tema, PAGE_WIDTH_PT / 2, 60, { align: 'center' });
+    doc.setFontSize(12);
+    const linhas = [
+      'Como jogar:',
+      '1. Cada participante recebe uma cartela com respostas distribuidas aleatoriamente.',
+      '2. O organizador sorteia uma ficha por vez e faz a leitura da pergunta.',
+      '3. Os participantes verificam se a resposta esta na cartela e marcam.',
+      '4. Vence quem completar a cartela primeiro.',
+    ];
+    linhas.forEach((linha, i) => {
+      doc.text(linha, 60, 120 + i * 20);
+    });
+  }
+
+  function renderCardPdf(doc, card, tema, theme, x, y) {
+    const primary = hexToRgb(theme.primary);
+    const background = hexToRgb(theme.background);
+    const text = hexToRgb(theme.text);
+
+    doc.setDrawColor(primary.r, primary.g, primary.b);
+    doc.setFillColor(background.r, background.g, background.b);
+    doc.rect(x, y, CARD_WIDTH_PT, CARD_HEIGHT_PT, 'FD');
+
+    doc.setTextColor(primary.r, primary.g, primary.b);
+    doc.setFontSize(20);
+    doc.text(tema, x + CARD_WIDTH_PT / 2, y + CARD_TITLE_MARGIN_TOP_PT + CARD_TITLE_HEIGHT_PT / 2, {
+      align: 'center',
+      baseline: 'middle',
+    });
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setTextColor(text.r, text.g, text.b);
+    doc.setFontSize(16);
+    for (let i = 0; i < card.length; i++) {
+      const cell = cardCellRect(i, card.length);
+      doc.rect(x + cell.x, y + cell.y, cell.width, cell.height, 'S');
+      doc.text(String(card[i].answer), x + cell.x + cell.width / 2, y + cell.y + cell.height / 2, {
+        align: 'center',
+        baseline: 'middle',
+      });
+    }
+  }
+
+  function renderTicketPdf(doc, entry, comGabarito, x, y) {
+    doc.setDrawColor(150, 150, 150);
+    doc.rect(x, y, TICKET_WIDTH_PT, TICKET_HEIGHT_PT, 'S');
+    doc.setFontSize(14);
+    doc.setTextColor(30, 30, 30);
+    const texto = comGabarito ? `${entry.question} = ${entry.answer}` : entry.question;
+    doc.text(texto, x + TICKET_WIDTH_PT / 2, y + TICKET_HEIGHT_PT / 2, {
+      align: 'center',
+      baseline: 'middle',
+      maxWidth: TICKET_CONTENT_SIZE_PT,
+    });
+  }
+
+  function renderMarcadoresPdfPage(doc, theme) {
+    const primary = hexToRgb(theme.primary);
+    doc.setFillColor(primary.r, primary.g, primary.b);
+    const raio = 15;
+    const colunas = 10;
+    const linhas = 6;
+    const espacamento = 60;
+    const inicioX = 60;
+    const inicioY = 60;
+    for (let linha = 0; linha < linhas; linha++) {
+      for (let coluna = 0; coluna < colunas; coluna++) {
+        doc.circle(inicioX + coluna * espacamento, inicioY + linha * espacamento, raio, 'F');
+      }
+    }
+  }
+
+  function renderRascunhoPdfPage(doc) {
+    doc.setFontSize(18);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Folha de rascunho', PAGE_WIDTH_PT / 2, 50, { align: 'center' });
+    doc.setDrawColor(200, 200, 200);
+    const inicioY = 90;
+    const fimX = PAGE_WIDTH_PT - 60;
+    for (let i = 0; i < 15; i++) {
+      const y = inicioY + i * 30;
+      doc.line(60, y, fimX, y);
+    }
+  }
+
+  function buildBingoPdf({ tema, cards, tickets, theme }) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [PAGE_WIDTH_PT, PAGE_HEIGHT_PT] });
+
+    renderExplicativaPdfPage(doc, tema);
+
+    const cardSlots = cardPositionsForPage();
+    cards.forEach((card, i) => {
+      const slotOnPage = i % CARDS_PER_PAGE;
+      if (slotOnPage === 0) newPdfPage(doc);
+      renderCardPdf(doc, card, tema, theme, cardSlots[slotOnPage].x, cardSlots[slotOnPage].y);
+    });
+
+    const ticketSlots = ticketPositionsForPage();
+    tickets.withAnswer.forEach((entry, i) => {
+      const slotOnPage = i % TICKETS_PER_PAGE;
+      if (slotOnPage === 0) newPdfPage(doc);
+      renderTicketPdf(doc, entry, true, ticketSlots[slotOnPage].x, ticketSlots[slotOnPage].y);
+    });
+
+    tickets.withoutAnswer.forEach((entry, i) => {
+      const slotOnPage = i % TICKETS_PER_PAGE;
+      if (slotOnPage === 0) newPdfPage(doc);
+      renderTicketPdf(doc, entry, false, ticketSlots[slotOnPage].x, ticketSlots[slotOnPage].y);
+    });
+
+    newPdfPage(doc);
+    renderMarcadoresPdfPage(doc, theme);
+
+    newPdfPage(doc);
+    renderRascunhoPdfPage(doc);
+
+    return doc;
+  }
+
   els.imagem.addEventListener('change', () => {
     const file = els.imagem.files[0];
     if (imagemPersonalizadaUrl) URL.revokeObjectURL(imagemPersonalizadaUrl);
@@ -728,6 +970,35 @@
   for (const el of [els.tema, els.perguntas, els.cartelas, els.respostasCartela, els.fonte]) {
     el.addEventListener('input', scheduleUpdate);
   }
+
+  els.botaoGerar.addEventListener('click', async () => {
+    const { bank, cellsPerCard, cardCount, hasDuplicates } = updateCheap();
+    if (hasDuplicates || bank.length === 0 || bank.length <= cellsPerCard) return;
+
+    els.botaoGerar.disabled = true;
+    const textoOriginal = els.botaoGerar.textContent;
+    els.botaoGerar.textContent = 'Gerando...';
+
+    try {
+      const theme = resolveTheme({ paletteId: paletaSelecionadaId, fontFamily: els.fonte.value });
+      const cards = generateUniqueCards(bank, cellsPerCard, cardCount);
+      const tickets = generateTickets(bank);
+      const tema = els.tema.value.trim() || 'Bingo';
+      const doc = buildBingoPdf({ tema, cards, tickets, theme });
+      const blob = doc.output('blob');
+
+      const downloads = await claude.use('downloads');
+      if (downloads) {
+        const nomeArquivo = tema.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'bingo';
+        await downloads.save({ filename: `${nomeArquivo}.pdf`, data: blob });
+      }
+    } catch (error) {
+      renderWarnings([{ level: 'error', message: `Não foi possível gerar o PDF: ${error.message}` }]);
+    } finally {
+      els.botaoGerar.disabled = hasDuplicates || bank.length === 0 || bank.length <= cellsPerCard;
+      els.botaoGerar.textContent = textoOriginal;
+    }
+  });
 
   renderPalettes();
   renderIcons();
