@@ -1,0 +1,667 @@
+<title>Gerador de Bingo Didático</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;600;700&family=Karla:wght@400;500;700&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --papel: #F3EFE3;
+    --superficie: #FFFFFF;
+    --tinta: #1F2A24;
+    --carimbo: #2F6F5E;
+    --mostarda: #C98A1F;
+    --caneta: #B23A2E;
+    --linha: #DCD3BE;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --papel: #1B1F1C;
+      --superficie: #242923;
+      --tinta: #ECE7DB;
+      --carimbo: #4FA88F;
+      --mostarda: #E0A83F;
+      --caneta: #E17B6C;
+      --linha: #3A362C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --papel: #1B1F1C;
+    --superficie: #242923;
+    --tinta: #ECE7DB;
+    --carimbo: #4FA88F;
+    --mostarda: #E0A83F;
+    --caneta: #E17B6C;
+    --linha: #3A362C;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--papel); color: var(--tinta); font-family: 'Karla', Arial, sans-serif; margin: 0; }
+  h1, h2, .passo-numero, .cartela-titulo { font-family: 'Zilla Slab', Georgia, serif; }
+  .topo { padding: 1.5rem 2rem; border-bottom: 1px solid var(--linha); }
+  .topo h1 { margin: 0; font-size: 1.5rem; font-weight: 600; }
+  .layout { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 2rem; padding: 2rem; max-width: 1100px; margin: 0 auto; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  .passo { border: 1px solid var(--linha); padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; background: var(--superficie); }
+  .passo-cabecalho { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.75rem; }
+  .passo-numero { font-size: 1.1rem; color: var(--carimbo); }
+  .passo h2 { margin: 0; font-size: 1.05rem; }
+  label { display: block; font-size: 0.85rem; margin-bottom: 0.3rem; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 0.5rem 0.6rem; border: 1px solid var(--linha);
+    background: var(--superficie); font-family: inherit; font-size: 0.95rem; color: var(--tinta);
+  }
+  textarea { min-height: 8rem; resize: vertical; }
+  .campo { margin-bottom: 0.9rem; }
+  .ajuda { font-size: 0.78rem; opacity: 0.7; margin-top: 0.25rem; }
+  .paletas { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+  .paleta-opcao { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; cursor: pointer; border: 1px solid transparent; padding: 0.3rem; background: none; font-family: inherit; color: inherit; }
+  .paleta-opcao.selecionada { border-color: var(--carimbo); }
+  .paleta-swatch { width: 2.2rem; height: 2.2rem; border: 1px solid var(--linha); display: block; }
+  .icones-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
+  .icone-opcao { border: 1px solid var(--linha); background: var(--superficie); padding: 0.4rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .icone-opcao.selecionado { border-color: var(--carimbo); }
+  .icone-opcao svg { width: 1.4rem; height: 1.4rem; }
+  .previa { position: sticky; top: 1.5rem; border: 1px solid var(--linha); background: var(--superficie); padding: 1.5rem; }
+  .cartela {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;
+    border: 2px solid var(--tema-primaria, var(--carimbo)); padding: 1rem; margin-bottom: 1rem;
+    text-align: center; font-family: var(--tema-fonte, 'Karla'), sans-serif;
+  }
+  .cartela-titulo { grid-column: 1 / -1; font-size: 1.1rem; color: var(--tema-primaria, var(--carimbo)); margin-bottom: 0.4rem; }
+  .cartela-celula { border: 1px solid var(--linha); padding: 0.75rem 0.3rem; font-size: 1.05rem; background: var(--tema-fundo, var(--superficie)); color: var(--tema-texto, var(--tinta)); }
+  .estimativa { font-size: 0.9rem; margin-bottom: 0.75rem; }
+  .estimativa strong { color: var(--carimbo); }
+  .avisos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+  .aviso { font-size: 0.85rem; padding: 0.5rem 0.7rem; border-left: 3px solid var(--caneta); background: color-mix(in srgb, var(--caneta) 12%, var(--superficie)); }
+  .aviso.aviso-ok { border-left-color: var(--carimbo); background: color-mix(in srgb, var(--carimbo) 12%, var(--superficie)); }
+  .imagem-preview { display: none; max-width: 4rem; margin-top: 0.5rem; border: 1px solid var(--linha); }
+</style>
+
+<header class="topo">
+  <h1>Gerador de Bingo Didático</h1>
+</header>
+
+<main class="layout">
+  <form class="formulario" id="formulario">
+    <section class="passo">
+      <div class="passo-cabecalho"><span class="passo-numero">1</span><h2>Tema</h2></div>
+      <div class="campo">
+        <label for="campo-tema">Nome do jogo</label>
+        <input type="text" id="campo-tema" placeholder="Ex.: Bingo da Porcentagem">
+      </div>
+    </section>
+
+    <section class="passo">
+      <div class="passo-cabecalho"><span class="passo-numero">2</span><h2>Perguntas</h2></div>
+      <div class="campo">
+        <label for="campo-perguntas">Perguntas e respostas</label>
+        <textarea id="campo-perguntas" placeholder="Uma por linha, no formato: pergunta | resposta&#10;Ex.: 10% de 20 | 2"></textarea>
+        <p class="ajuda">Uma pergunta por linha, separando pergunta e resposta com "|". <span id="contagem-perguntas">0 perguntas</span></p>
+      </div>
+    </section>
+
+    <section class="passo">
+      <div class="passo-cabecalho"><span class="passo-numero">3</span><h2>Cartelas</h2></div>
+      <div class="campo">
+        <label for="campo-cartelas">Número de cartelas</label>
+        <input type="number" id="campo-cartelas" min="1" value="40">
+      </div>
+      <div class="campo">
+        <label for="campo-respostas-cartela">Respostas por cartela</label>
+        <input type="number" id="campo-respostas-cartela" min="1" value="9">
+      </div>
+    </section>
+
+    <section class="passo">
+      <div class="passo-cabecalho"><span class="passo-numero">4</span><h2>Visual</h2></div>
+      <div class="campo">
+        <label>Paleta de cores</label>
+        <div class="paletas" id="paletas"></div>
+      </div>
+      <div class="campo">
+        <label for="campo-fonte">Tipografia da cartela</label>
+        <select id="campo-fonte">
+          <option value="Karla, Arial, sans-serif">Karla (sans)</option>
+          <option value="Zilla Slab, Georgia, serif">Zilla Slab (serifada)</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Ícone do tema</label>
+        <div class="icones-grade" id="icones-grade"></div>
+      </div>
+      <div class="campo">
+        <label for="campo-imagem">Ou envie sua própria imagem</label>
+        <input type="file" id="campo-imagem" accept="image/*">
+        <img class="imagem-preview" id="imagem-preview" alt="Pré-visualização da imagem enviada">
+      </div>
+    </section>
+  </form>
+
+  <aside class="previa" aria-live="polite">
+    <div class="cartela" id="cartela-preview">
+      <div class="cartela-titulo" id="cartela-titulo">Bingo</div>
+    </div>
+    <div class="estimativa" id="estimativa">Adicione perguntas para ver a estimativa de duração do jogo.</div>
+    <ul class="avisos" id="avisos"></ul>
+  </aside>
+</main>
+
+<script type="module">
+  // ===== INÍCIO: motor inlined (Plano 1 + Plano 2) =====
+
+  // --- src/gameMath.mjs ---
+  function estimateSingleCardDraws(bankSize, cellsPerCard) {
+    if (bankSize <= 0 || cellsPerCard <= 0) {
+      const error = new RangeError('bankSize and cellsPerCard must be positive');
+      error.code = 'invalid-arguments';
+      throw error;
+    }
+    return (cellsPerCard * (bankSize + 1)) / (cellsPerCard + 1);
+  }
+
+  const DEFAULT_CELLS_PER_CARD = 9;
+  const DEFAULT_CARD_COUNT = 40;
+
+  function simulateGameLength(bankSize, cellsPerCard, cardCount, options = {}) {
+    const { trials = 400, random = Math.random } = options;
+    if (cellsPerCard > bankSize) {
+      const error = new RangeError('cellsPerCard cannot exceed bankSize');
+      error.code = 'cells-exceed-bank-size';
+      throw error;
+    }
+    if (trials <= 0) {
+      const error = new RangeError('trials must be a positive number');
+      error.code = 'invalid-trials';
+      throw error;
+    }
+
+    const pool = Array.from({ length: bankSize }, (_, i) => i);
+    const gameLengths = [];
+
+    for (let t = 0; t < trials; t++) {
+      const drawOrder = shuffle(pool, random);
+      const position = new Map();
+      drawOrder.forEach((item, idx) => position.set(item, idx));
+
+      const seenCards = new Set();
+      const cards = [];
+      let attempts = 0;
+      while (cards.length < cardCount && attempts < cardCount * 200) {
+        attempts++;
+        const card = shuffle(pool, random).slice(0, cellsPerCard);
+        const key = card.slice().sort((a, b) => a - b).join(',');
+        if (!seenCards.has(key)) {
+          seenCards.add(key);
+          cards.push(card);
+        }
+      }
+
+      const completions = cards.map(
+        (card) => Math.max(...card.map((item) => position.get(item))) + 1
+      );
+      gameLengths.push(Math.min(...completions));
+    }
+
+    gameLengths.sort((a, b) => a - b);
+    const n = gameLengths.length;
+    const meanDraws = gameLengths.reduce((sum, v) => sum + v, 0) / n;
+    const percentOfBankUsed = (meanDraws / bankSize) * 100;
+
+    return {
+      meanDraws,
+      medianDraws: percentile(gameLengths, 0.5),
+      p10Draws: percentile(gameLengths, 0.1),
+      p90Draws: percentile(gameLengths, 0.9),
+      percentOfBankUsed,
+    };
+  }
+
+  function checkBankSizeRatio({ bankSize, cellsPerCard, cardCount, percentOfBankUsed }) {
+    const issues = [];
+
+    if (bankSize <= cellsPerCard) {
+      issues.push({
+        level: 'error',
+        code: 'bank-too-small',
+        message: `O banco tem ${bankSize} pergunta(s), mas cada cartela precisa de ${cellsPerCard} respostas. Adicione mais perguntas ou reduza respostas por cartela.`,
+      });
+      return issues;
+    }
+
+    if (bankSize < 1.5 * cellsPerCard) {
+      issues.push({
+        level: 'warning',
+        code: 'bank-small',
+        message: `Com apenas ${bankSize} perguntas para ${cellsPerCard} respostas por cartela, o jogo tende a ficar curto e pouco competitivo. Considere adicionar mais perguntas.`,
+      });
+    }
+
+    if (typeof percentOfBankUsed === 'number' && percentOfBankUsed < 40) {
+      issues.push({
+        level: 'warning',
+        code: 'bank-large',
+        message: `Em média, apenas ${percentOfBankUsed.toFixed(0)}% do banco será sorteado antes de alguém vencer. Boa parte das perguntas pode nunca ser usada nesta partida.`,
+      });
+    }
+
+    if (typeof cardCount === 'number' && !combinationsAtLeast(bankSize, cellsPerCard, cardCount * 10)) {
+      issues.push({
+        level: 'warning',
+        code: 'combinations-tight',
+        message: `Com ${bankSize} perguntas e ${cellsPerCard} respostas por cartela, há poucas combinações possíveis para ${cardCount} cartelas únicas. Considere adicionar mais perguntas ou reduzir o número de cartelas.`,
+      });
+    }
+
+    if (issues.length === 0) {
+      issues.push({ level: 'ok', code: 'ok', message: 'Proporção de perguntas por cartela está balanceada.' });
+    }
+
+    return issues;
+  }
+
+  function shuffle(array, random) {
+    const copy = array.slice();
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  function percentile(sortedArray, p) {
+    const idx = Math.min(sortedArray.length - 1, Math.floor(p * sortedArray.length));
+    return sortedArray[idx];
+  }
+
+  // Returns true if C(n, k) >= threshold, computed incrementally to avoid
+  // integer overflow on large n/k (we only ever need to know if it clears
+  // the threshold, not its exact value).
+  function combinationsAtLeast(n, k, threshold) {
+    if (k < 0 || k > n) return false;
+    if (k === 0 || k === n) return threshold <= 1;
+    let result = 1;
+    for (let i = 0; i < k; i++) {
+      result = (result * (n - i)) / (i + 1);
+      if (result >= threshold) return true;
+    }
+    return result >= threshold;
+  }
+
+  // --- src/cardGenerator.mjs (shuffle já definida acima) ---
+  function findDuplicateAnswers(bank) {
+    const seen = new Map();
+    for (const entry of bank) {
+      const key = normalizeAnswer(entry.answer);
+      if (!seen.has(key)) seen.set(key, []);
+      seen.get(key).push(entry);
+    }
+    return [...seen.values()].filter((group) => group.length > 1);
+  }
+
+  function generateUniqueCards(bank, cellsPerCard, cardCount, options = {}) {
+    const { random = Math.random, maxAttempts = cardCount * 500 } = options;
+
+    if (cellsPerCard > bank.length) {
+      const error = new RangeError(
+        `Não é possível montar cartelas de ${cellsPerCard} respostas com um banco de apenas ${bank.length} pergunta(s).`
+      );
+      error.code = 'cells-exceed-bank';
+      throw error;
+    }
+
+    const seenKeys = new Set();
+    const cards = [];
+    let attempts = 0;
+
+    while (cards.length < cardCount) {
+      if (attempts >= maxAttempts) {
+        const error = new Error(
+          `Não foi possível gerar ${cardCount} cartelas únicas com ${cellsPerCard} respostas cada a partir de ${bank.length} perguntas. Aumente o banco de perguntas ou reduza o número de cartelas.`
+        );
+        error.code = 'insufficient-combinations';
+        throw error;
+      }
+      attempts++;
+
+      const sampleIndexes = shuffle(
+        Array.from({ length: bank.length }, (_, i) => i),
+        random
+      ).slice(0, cellsPerCard);
+
+      const cardEntries = sampleIndexes.map((i) => ({ ...bank[i] }));
+      const key = cardEntries
+        .map((entry) => normalizeAnswer(entry.answer))
+        .sort()
+        .join(',');
+      if (seenKeys.has(key)) continue;
+
+      seenKeys.add(key);
+      cards.push(shuffle(cardEntries, random));
+    }
+
+    return cards;
+  }
+
+  function normalizeAnswer(answer) {
+    return String(answer).normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  // --- src/ticketGenerator.mjs ---
+  function generateTickets(bank) {
+    const withAnswer = bank.map((entry) => ({ question: entry.question, answer: entry.answer }));
+    const withoutAnswer = bank.map((entry) => ({ question: entry.question }));
+    return { withAnswer, withoutAnswer };
+  }
+
+  // --- src/theme.mjs ---
+  const PALETTE_PRESETS = [
+    { id: 'classico', name: 'Clássico', primary: '#2F6F5E', accent: '#C98A1F', background: '#FFFFFF', text: '#1F2A24' },
+    { id: 'alegre', name: 'Alegre', primary: '#D6486B', accent: '#3FA7A0', background: '#FFFFFF', text: '#241B2F' },
+    { id: 'oceano', name: 'Oceano', primary: '#1D5C8A', accent: '#F2A65A', background: '#FFFFFF', text: '#132433' },
+    { id: 'floresta', name: 'Floresta', primary: '#3B6B35', accent: '#E4B73B', background: '#FFFFFF', text: '#1B2A17' },
+  ];
+
+  function isValidHexColor(value) {
+    return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value);
+  }
+
+  function resolveTheme({ paletteId, customColors = {}, fontFamily } = {}) {
+    const preset = PALETTE_PRESETS.find((p) => p.id === paletteId) ?? PALETTE_PRESETS[0];
+    const colors = {
+      primary: preset.primary,
+      accent: preset.accent,
+      background: preset.background,
+      text: preset.text,
+    };
+
+    for (const key of Object.keys(colors)) {
+      const custom = customColors[key];
+      if (custom === undefined) continue;
+      if (!isValidHexColor(custom)) {
+        const error = new Error(`Cor inválida para "${key}": "${custom}". Use um hexadecimal no formato #RRGGBB.`);
+        error.code = 'invalid-color';
+        throw error;
+      }
+      colors[key] = custom;
+    }
+
+    return {
+      ...colors,
+      fontFamily: fontFamily || 'Karla, sans-serif',
+    };
+  }
+
+  function tintSvg(svgMarkup, hexColor) {
+    if (!isValidHexColor(hexColor)) {
+      const error = new Error(`Cor inválida para tingir o ícone: "${hexColor}".`);
+      error.code = 'invalid-color';
+      throw error;
+    }
+    return svgMarkup.replace(/(fill|stroke)="#[0-9a-fA-F]{3,6}"/g, `$1="${hexColor}"`);
+  }
+
+  // --- src/icons.mjs ---
+  const ICON_CATEGORIES = {
+    matematica: [
+      {
+        id: 'matematica-percentual',
+        label: 'Percentual',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 18L18 6" stroke="#000000" stroke-width="2" stroke-linecap="round"/><circle cx="7" cy="7" r="2.5" fill="#000000"/><circle cx="17" cy="17" r="2.5" fill="#000000"/></svg>',
+      },
+      {
+        id: 'matematica-soma',
+        label: 'Soma',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16M4 12h16" stroke="#000000" stroke-width="2.5" stroke-linecap="round"/></svg>',
+      },
+    ],
+    geografia: [
+      {
+        id: 'geografia-globo',
+        label: 'Globo',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" fill="none" stroke="#000000" stroke-width="2"/><ellipse cx="12" cy="12" rx="4" ry="9" fill="none" stroke="#000000" stroke-width="2"/><path d="M3 12h18" stroke="#000000" stroke-width="2"/></svg>',
+      },
+      {
+        id: 'geografia-mapa',
+        label: 'Mapa',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="round"/></svg>',
+      },
+    ],
+    ciencias: [
+      {
+        id: 'ciencias-frasco',
+        label: 'Frasco',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 3h4v6l5 9a2 2 0 01-1.8 3H6.8A2 2 0 015 18l5-9z" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="round"/></svg>',
+      },
+      {
+        id: 'ciencias-folha',
+        label: 'Folha',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 20c8 0 16-8 16-16-8 0-16 8-16 16z" fill="#000000"/></svg>',
+      },
+    ],
+    portugues: [
+      {
+        id: 'portugues-livro',
+        label: 'Livro',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 5h7v14H4zM13 5h7v14h-7z" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="round"/></svg>',
+      },
+      {
+        id: 'portugues-fala',
+        label: 'Balão de fala',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 5h16v10H9l-4 4z" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="round"/></svg>',
+      },
+    ],
+    historia: [
+      {
+        id: 'historia-coluna',
+        label: 'Coluna',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 20h16M6 20V9M10 20V9M14 20V9M18 20V9M4 9l8-5 8 5" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      },
+      {
+        id: 'historia-pergaminho',
+        label: 'Pergaminho',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 4h12v16H6a2 2 0 010-4V6a2 2 0 000-2z" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="round"/></svg>',
+      },
+    ],
+    geral: [
+      {
+        id: 'geral-estrela',
+        label: 'Estrela',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 17l-5.6 3.1 1.4-6.3-4.8-4.3 6.4-.6z" fill="#000000"/></svg>',
+      },
+      {
+        id: 'geral-lampada',
+        label: 'Lâmpada',
+        svg: '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3 11.2V17h6v-2.8A6 6 0 0012 3z" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      },
+    ],
+  };
+
+  // ===== FIM: motor inlined =====
+
+  function parseQuestionBank(text) {
+    return text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => {
+        const [question, answer] = line.split('|').map((part) => (part ?? '').trim());
+        return { question: question ?? '', answer: answer ?? '' };
+      })
+      .filter((entry) => entry.question && entry.answer);
+  }
+
+  function debounce(fn, delay) {
+    let handle;
+    return (...args) => {
+      clearTimeout(handle);
+      handle = setTimeout(() => fn(...args), delay);
+    };
+  }
+
+  const els = {
+    tema: document.getElementById('campo-tema'),
+    perguntas: document.getElementById('campo-perguntas'),
+    contagem: document.getElementById('contagem-perguntas'),
+    cartelas: document.getElementById('campo-cartelas'),
+    respostasCartela: document.getElementById('campo-respostas-cartela'),
+    fonte: document.getElementById('campo-fonte'),
+    imagem: document.getElementById('campo-imagem'),
+    imagemPreview: document.getElementById('imagem-preview'),
+    paletas: document.getElementById('paletas'),
+    iconesGrade: document.getElementById('icones-grade'),
+    cartelaPreview: document.getElementById('cartela-preview'),
+    cartelaTitulo: document.getElementById('cartela-titulo'),
+    estimativa: document.getElementById('estimativa'),
+    avisos: document.getElementById('avisos'),
+  };
+
+  let paletaSelecionadaId = PALETTE_PRESETS[0].id;
+  let iconeSelecionadoId = null;
+  let imagemPersonalizadaUrl = null;
+
+  function renderPalettes() {
+    els.paletas.innerHTML = '';
+    for (const preset of PALETTE_PRESETS) {
+      const opcao = document.createElement('button');
+      opcao.type = 'button';
+      opcao.className = 'paleta-opcao' + (preset.id === paletaSelecionadaId ? ' selecionada' : '');
+      opcao.innerHTML = `<span class="paleta-swatch" style="background:${preset.primary}"></span><span>${preset.name}</span>`;
+      opcao.addEventListener('click', () => {
+        paletaSelecionadaId = preset.id;
+        renderPalettes();
+        scheduleUpdate();
+      });
+      els.paletas.appendChild(opcao);
+    }
+  }
+
+  function findIconById(id) {
+    for (const categoria of Object.values(ICON_CATEGORIES)) {
+      const found = categoria.find((icone) => icone.id === id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function renderIcons() {
+    els.iconesGrade.innerHTML = '';
+    for (const categoria of Object.values(ICON_CATEGORIES)) {
+      for (const icone of categoria) {
+        const botao = document.createElement('button');
+        botao.type = 'button';
+        botao.className = 'icone-opcao' + (icone.id === iconeSelecionadoId ? ' selecionado' : '');
+        botao.title = icone.label;
+        botao.innerHTML = icone.svg;
+        botao.addEventListener('click', () => {
+          iconeSelecionadoId = iconeSelecionadoId === icone.id ? null : icone.id;
+          renderIcons();
+          scheduleUpdate();
+        });
+        els.iconesGrade.appendChild(botao);
+      }
+    }
+  }
+
+  function renderWarnings(issues) {
+    els.avisos.innerHTML = '';
+    for (const issue of issues) {
+      const item = document.createElement('li');
+      item.className = 'aviso' + (issue.level === 'ok' ? ' aviso-ok' : '');
+      item.textContent = issue.message;
+      els.avisos.appendChild(item);
+    }
+  }
+
+  function renderPreviewCard(bank, cellsPerCard, theme) {
+    els.cartelaPreview.querySelectorAll('.cartela-celula').forEach((cell) => cell.remove());
+    if (bank.length === 0 || bank.length <= cellsPerCard) return;
+
+    let card;
+    try {
+      card = generateUniqueCards(bank, cellsPerCard, 1)[0];
+    } catch {
+      return;
+    }
+
+    const iconeSelecionado = iconeSelecionadoId ? findIconById(iconeSelecionadoId) : null;
+    if (iconeSelecionado && !imagemPersonalizadaUrl) {
+      const tintado = tintSvg(iconeSelecionado.svg, theme.primary);
+      const iconeCelula = document.createElement('div');
+      iconeCelula.className = 'cartela-celula';
+      iconeCelula.innerHTML = tintado;
+      els.cartelaPreview.appendChild(iconeCelula);
+      card = card.slice(0, cellsPerCard - 1);
+    }
+
+    for (const entry of card) {
+      const celula = document.createElement('div');
+      celula.className = 'cartela-celula';
+      celula.textContent = entry.answer;
+      els.cartelaPreview.appendChild(celula);
+    }
+  }
+
+  function updateCheap() {
+    const bank = parseQuestionBank(els.perguntas.value);
+    els.contagem.textContent = `${bank.length} pergunta${bank.length === 1 ? '' : 's'}`;
+
+    const cellsPerCard = Number(els.respostasCartela.value) || DEFAULT_CELLS_PER_CARD;
+    const cardCount = Number(els.cartelas.value) || DEFAULT_CARD_COUNT;
+
+    const theme = resolveTheme({ paletteId: paletaSelecionadaId, fontFamily: els.fonte.value });
+
+    els.cartelaTitulo.textContent = els.tema.value.trim() || 'Bingo';
+    els.cartelaPreview.style.setProperty('--tema-primaria', theme.primary);
+    els.cartelaPreview.style.setProperty('--tema-fundo', theme.background);
+    els.cartelaPreview.style.setProperty('--tema-texto', theme.text);
+    els.cartelaPreview.style.setProperty('--tema-fonte', theme.fontFamily);
+
+    const duplicates = findDuplicateAnswers(bank);
+    let issues = [];
+    if (duplicates.length > 0) {
+      issues = duplicates.map((group) => ({
+        level: 'error',
+        message: `Respostas repetidas: ${group.map((entry) => `"${entry.answer}"`).join(', ')} — cada resposta precisa ser única.`,
+      }));
+    } else if (bank.length > 0) {
+      issues = checkBankSizeRatio({ bankSize: bank.length, cellsPerCard, cardCount });
+    }
+    renderWarnings(issues);
+    renderPreviewCard(bank, cellsPerCard, theme);
+
+    return { bank, cellsPerCard, cardCount, hasDuplicates: duplicates.length > 0 };
+  }
+
+  const scheduleAccurateEstimate = debounce((bank, cellsPerCard, cardCount) => {
+    if (bank.length <= cellsPerCard) return;
+    const { percentOfBankUsed, meanDraws } = simulateGameLength(bank.length, cellsPerCard, cardCount, { trials: 200 });
+    els.estimativa.innerHTML = `Com ${cardCount} cartelas em jogo: <strong>~${meanDraws.toFixed(0)} sorteios</strong> até o 1º vencedor, usando ~${percentOfBankUsed.toFixed(0)}% do banco.`;
+    renderWarnings(checkBankSizeRatio({ bankSize: bank.length, cellsPerCard, cardCount, percentOfBankUsed }));
+  }, 300);
+
+  function scheduleUpdate() {
+    const { bank, cellsPerCard, cardCount, hasDuplicates } = updateCheap();
+    if (!hasDuplicates && bank.length > cellsPerCard) {
+      scheduleAccurateEstimate(bank, cellsPerCard, cardCount);
+    } else if (bank.length === 0) {
+      els.estimativa.textContent = 'Adicione perguntas para ver a estimativa de duração do jogo.';
+    }
+  }
+
+  els.imagem.addEventListener('change', () => {
+    const file = els.imagem.files[0];
+    imagemPersonalizadaUrl = file ? URL.createObjectURL(file) : null;
+    if (imagemPersonalizadaUrl) {
+      els.imagemPreview.src = imagemPersonalizadaUrl;
+      els.imagemPreview.style.display = 'block';
+    } else {
+      els.imagemPreview.style.display = 'none';
+    }
+    scheduleUpdate();
+  });
+
+  for (const el of [els.tema, els.perguntas, els.cartelas, els.respostasCartela, els.fonte]) {
+    el.addEventListener('input', scheduleUpdate);
+  }
+
+  renderPalettes();
+  renderIcons();
+  scheduleUpdate();
+</script>
