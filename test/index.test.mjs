@@ -68,3 +68,11 @@ test('the full pipeline (validate -> generate cards -> generate tickets) produce
   }
   assert.equal(withoutAnswer.length, bank.length);
 });
+
+test('index.mjs re-exports the theme and icon library', () => {
+  assert.equal(typeof engine.isValidHexColor, 'function');
+  assert.equal(typeof engine.resolveTheme, 'function');
+  assert.equal(typeof engine.tintSvg, 'function');
+  assert.ok(Array.isArray(engine.PALETTE_PRESETS));
+  assert.equal(typeof engine.ICON_CATEGORIES, 'object');
+});
