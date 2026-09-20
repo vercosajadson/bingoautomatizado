@@ -923,10 +923,21 @@
       0.12
     );
 
+    if (comGabarito) {
+      doc.setFont('helvetica');
+      doc.setFontSize(9);
+      doc.setTextColor(120, 120, 120);
+      doc.text(`${entry.question} = ${entry.answer}`, x + TICKET_WIDTH_PT / 2, y + 16, {
+        align: 'center',
+        maxWidth: TICKET_WIDTH_PT - 24,
+      });
+    }
+
     doc.setFont('helvetica');
     doc.setTextColor(30, 30, 30);
-    const texto = comGabarito ? `${entry.question} = ${entry.answer}` : entry.question;
-    drawFittedText(doc, texto, x + TICKET_WIDTH_PT / 2, y + TICKET_HEIGHT_PT / 2, TICKET_WIDTH_PT - 40, TICKET_HEIGHT_PT - 30, 14, 8);
+    const areaY = comGabarito ? y + TICKET_HEIGHT_PT / 2 + 10 : y + TICKET_HEIGHT_PT / 2;
+    const areaHeight = comGabarito ? TICKET_HEIGHT_PT - 55 : TICKET_HEIGHT_PT - 30;
+    drawFittedText(doc, entry.question, x + TICKET_WIDTH_PT / 2, areaY, TICKET_WIDTH_PT - 40, areaHeight, 14, 8);
   }
 
   function buildBingoPdf({ tema, cards, tickets, theme, watermarkImageDataUrl }) {
