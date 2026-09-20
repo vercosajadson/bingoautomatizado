@@ -158,7 +158,7 @@
     <div class="estimativa" id="estimativa" aria-live="polite">Adicione perguntas para ver a estimativa de duração do jogo.</div>
     <ul class="avisos" id="avisos" aria-live="polite"></ul>
     <button type="button" id="botao-gerar" class="botao-primario" disabled>Gerar bingo</button>
-    <p class="ajuda">O PDF inclui cartelas, fichas de sorteio (com e sem gabarito), folha explicativa, marcadores e uma folha de rascunho.</p>
+    <p class="ajuda">O PDF inclui as cartelas e as fichas de sorteio (com e sem gabarito).</p>
   </aside>
 </main>
 
@@ -831,23 +831,6 @@
     doc.addPage([PAGE_WIDTH_PT, PAGE_HEIGHT_PT], 'landscape');
   }
 
-  function renderExplicativaPdfPage(doc, tema) {
-    doc.setFontSize(24);
-    doc.setTextColor(30, 30, 30);
-    doc.text(tema, PAGE_WIDTH_PT / 2, 60, { align: 'center' });
-    doc.setFontSize(12);
-    const linhas = [
-      'Como jogar:',
-      '1. Cada participante recebe uma cartela com respostas distribuídas aleatoriamente.',
-      '2. O organizador sorteia uma ficha por vez e faz a leitura da pergunta.',
-      '3. Os participantes verificam se a resposta está na cartela e marcam.',
-      '4. Vence quem completar a cartela primeiro.',
-    ];
-    linhas.forEach((linha, i) => {
-      doc.text(linha, 60, 120 + i * 20);
-    });
-  }
-
   function jsPdfFontForTheme(fontFamily) {
     return fontFamily && fontFamily.startsWith('Zilla') ? 'times' : 'helvetica';
   }
@@ -946,37 +929,6 @@
     drawFittedText(doc, texto, x + TICKET_WIDTH_PT / 2, y + TICKET_HEIGHT_PT / 2, TICKET_WIDTH_PT - 40, TICKET_HEIGHT_PT - 30, 14, 8);
   }
 
-  function renderMarcadoresPdfPage(doc, theme) {
-    const primary = hexToRgb(theme.primary);
-    doc.setFillColor(primary.r, primary.g, primary.b);
-    const raio = 15;
-    const colunas = 10;
-    const linhas = 6;
-    const espacamento = 60;
-    const inicioX = 60;
-    const inicioY = 60;
-    for (let linha = 0; linha < linhas; linha++) {
-      for (let coluna = 0; coluna < colunas; coluna++) {
-        doc.circle(inicioX + coluna * espacamento, inicioY + linha * espacamento, raio, 'F');
-      }
-    }
-  }
-
-  function renderRascunhoPdfPage(doc, theme) {
-    const primary = hexToRgb(theme.primary);
-    doc.setFont('helvetica');
-    doc.setFontSize(18);
-    doc.setTextColor(primary.r, primary.g, primary.b);
-    doc.text('Folha de rascunho', PAGE_WIDTH_PT / 2, 50, { align: 'center' });
-    doc.setDrawColor(200, 200, 200);
-    const inicioY = 90;
-    const fimX = PAGE_WIDTH_PT - 60;
-    for (let i = 0; i < 15; i++) {
-      const y = inicioY + i * 30;
-      doc.line(60, y, fimX, y);
-    }
-  }
-
   function buildBingoPdf({ tema, cards, tickets, theme, watermarkImageDataUrl }) {
     if (!window.jspdf) {
       throw new Error('A biblioteca de geração de PDF não carregou. Verifique sua conexão e recarregue a página.');
@@ -984,12 +936,10 @@
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [PAGE_WIDTH_PT, PAGE_HEIGHT_PT] });
 
-    renderExplicativaPdfPage(doc, tema);
-
     const cardSlots = cardPositionsForPage();
     cards.forEach((card, i) => {
       const slotOnPage = i % CARDS_PER_PAGE;
-      if (slotOnPage === 0) newPdfPage(doc);
+      if (i > 0 && slotOnPage === 0) newPdfPage(doc);
       renderCardPdf(doc, card, tema, theme, cardSlots[slotOnPage].x, cardSlots[slotOnPage].y, watermarkImageDataUrl);
     });
 
@@ -1005,12 +955,6 @@
       if (slotOnPage === 0) newPdfPage(doc);
       renderTicketPdf(doc, entry, false, ticketSlots[slotOnPage].x, ticketSlots[slotOnPage].y, watermarkImageDataUrl);
     });
-
-    newPdfPage(doc);
-    renderMarcadoresPdfPage(doc, theme);
-
-    newPdfPage(doc);
-    renderRascunhoPdfPage(doc, theme);
 
     return doc;
   }
