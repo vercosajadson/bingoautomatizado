@@ -543,6 +543,9 @@
 
   const TICKET_CONTENT_SIZE_PT = 129.3;
 
+  const CARD_BORDER_WIDTH_PT = 1.5;
+  const TICKET_BORDER_WIDTH_PT = 0.75;
+
   function gridDimensions(cellsPerCard) {
     const columns = Math.ceil(Math.sqrt(cellsPerCard));
     const rows = Math.ceil(cellsPerCard / columns);
@@ -871,6 +874,7 @@
 
     doc.setDrawColor(primary.r, primary.g, primary.b);
     doc.setFillColor(background.r, background.g, background.b);
+    doc.setLineWidth(CARD_BORDER_WIDTH_PT);
     doc.rect(x, y, CARD_WIDTH_PT, CARD_HEIGHT_PT, 'FD');
 
     drawWatermarkImage(
@@ -892,8 +896,9 @@
     });
 
     doc.setFont('helvetica');
-    doc.setDrawColor(200, 200, 200);
+    doc.setDrawColor(primary.r, primary.g, primary.b);
     doc.setTextColor(text.r, text.g, text.b);
+    doc.setLineWidth(CARD_BORDER_WIDTH_PT);
     for (let i = 0; i < card.length; i++) {
       const cell = cardCellRect(i, card.length);
       doc.rect(x + cell.x, y + cell.y, cell.width, cell.height, 'S');
@@ -912,6 +917,7 @@
 
   function renderTicketPdf(doc, entry, comGabarito, x, y, watermarkImageDataUrl) {
     doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(TICKET_BORDER_WIDTH_PT);
     doc.rect(x, y, TICKET_WIDTH_PT, TICKET_HEIGHT_PT, 'S');
 
     drawWatermarkImage(
